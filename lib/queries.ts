@@ -393,7 +393,7 @@ export async function getUnreadMessageCount(): Promise<number> {
 // ───────────────────── Dashboard stats ─────────────────────
 
 export async function getDashboardStats() {
-  const [counts, categories, views, unread, latest, mostViewed] = await Promise.all([
+  const [counts, categories, unread, latest] = await Promise.all([
     queryOne<{ total: number; published: number; drafts: number }>(
       `SELECT COUNT(*) AS total,
         SUM(status = 'published') AS published,
@@ -401,24 +401,15 @@ export async function getDashboardStats() {
        FROM movies`
     ),
     queryOne<{ c: number }>('SELECT COUNT(*) AS c FROM categories'),
-    getTotalViews(),
     getUnreadMessageCount(),
     query<Movie>('SELECT * FROM movies ORDER BY created_at DESC LIMIT 5'),
-    query<Movie & { views: number }>(
-      `SELECT m.*, COALESCE(pv.views, 0) AS views
-       FROM movies m LEFT JOIN page_views pv ON pv.movie_id = m.id
-       WHERE m.status = 'published'
-       ORDER BY pv.views DESC LIMIT 5`
-    ),
   ]);
   return {
     totalMovies: Number(counts?.total ?? 0),
     publishedMovies: Number(counts?.published ?? 0),
     draftMovies: Number(counts?.drafts ?? 0),
     totalCategories: Number(categories?.c ?? 0),
-    totalViews: views,
     unreadMessages: unread,
     latestMovies: latest,
-    mostViewed,
   };
 }

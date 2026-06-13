@@ -11,10 +11,8 @@ export default async function AdminDashboard() {
     publishedMovies: 0,
     draftMovies: 0,
     totalCategories: 0,
-    totalViews: 0,
     unreadMessages: 0,
     latestMovies: [],
-    mostViewed: [],
   };
   let dbError = false;
   try {
@@ -56,12 +54,6 @@ export default async function AdminDashboard() {
       href: '/admin/messages',
       alert: stats.unreadMessages > 0,
     },
-    {
-      label: 'Total Page Views',
-      value: stats.totalViews.toLocaleString(),
-      sub: 'All movie pages combined',
-      href: '/admin/movies',
-    },
   ];
 
   return (
@@ -101,76 +93,44 @@ export default async function AdminDashboard() {
         ))}
       </div>
 
-      <div className="mt-8 grid gap-6 lg:grid-cols-2">
-        <DashboardList
-          title="Latest 5 Added Movies"
-          movies={stats.latestMovies.map((m) => ({ ...m, meta: formatDate(m.created_at) }))}
-        />
-        <DashboardList
-          title="Most Viewed Movies"
-          movies={stats.mostViewed.map((m) => ({
-            ...m,
-            meta: `${(m as { views?: number }).views?.toLocaleString() ?? 0} views`,
-          }))}
-        />
-      </div>
-    </div>
-  );
-}
-
-function DashboardList({
-  title,
-  movies,
-}: {
-  title: string;
-  movies: {
-    id: number;
-    title: string;
-    slug: string;
-    year: number | null;
-    poster_url: string | null;
-    status: string;
-    meta: string;
-  }[];
-}) {
-  return (
-    <div className="rounded-card border border-border bg-surface">
-      <div className="flex items-center justify-between border-b border-border px-5 py-4">
-        <h2 className="font-bold">{title}</h2>
-        <Link href="/admin/movies" className="text-sm font-semibold text-accent hover:underline">
-          View all
-        </Link>
-      </div>
-      <div className="divide-y divide-border">
-        {movies.length === 0 && (
-          <p className="px-5 py-6 text-sm text-white/40">No movies yet. Add your first one!</p>
-        )}
-        {movies.map((m) => (
-          <Link
-            key={m.id}
-            href={`/admin/movies/${m.id}/edit`}
-            className="flex items-center gap-4 px-5 py-3 hover:bg-white/5"
-          >
-            <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded bg-black/40">
-              {m.poster_url && (
-                <Image src={m.poster_url} alt="" fill sizes="40px" className="object-cover" />
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="truncate font-medium">{m.title}</p>
-              <p className="text-xs text-white/40">
-                {m.year || '—'} • {m.meta}
-              </p>
-            </div>
-            <span
-              className={`badge ${
-                m.status === 'published' ? 'bg-accent text-black' : 'border border-border text-white/50'
-              }`}
-            >
-              {m.status}
-            </span>
+      <div className="mt-8 rounded-card border border-border bg-surface">
+        <div className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="font-bold">Latest 5 Added Movies</h2>
+          <Link href="/admin/movies" className="text-sm font-semibold text-accent hover:underline">
+            View all
           </Link>
-        ))}
+        </div>
+        <div className="divide-y divide-border">
+          {stats.latestMovies.length === 0 && (
+            <p className="px-5 py-6 text-sm text-white/40">No movies yet. Add your first one!</p>
+          )}
+          {stats.latestMovies.map((m) => (
+            <Link
+              key={m.id}
+              href={`/admin/movies/${m.id}/edit`}
+              className="flex items-center gap-4 px-5 py-3 hover:bg-white/5"
+            >
+              <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded bg-black/40">
+                {m.poster_url && (
+                  <Image src={m.poster_url} alt="" fill sizes="40px" className="object-cover" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{m.title}</p>
+                <p className="text-xs text-white/40">
+                  {m.year || '—'} • {formatDate(m.created_at)}
+                </p>
+              </div>
+              <span
+                className={`badge ${
+                  m.status === 'published' ? 'bg-accent text-black' : 'border border-border text-white/50'
+                }`}
+              >
+                {m.status}
+              </span>
+            </Link>
+          ))}
+        </div>
       </div>
     </div>
   );
