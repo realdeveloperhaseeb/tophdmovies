@@ -1,0 +1,6 @@
+<svg width="220" height="48" viewBox="0 0 220 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="1.5" y="1.5" width="45" height="45" rx="11" fill="#111111" stroke="#1f1f1f" stroke-width="2"/>
+  <path d="M19 16.5L33 24L19 31.5V16.5Z" fill="#22c55e"/>
+  <rect x="8" y="36" width="32" height="3" rx="1.5" fill="#22c55e" opacity="0.35"/>
+  <text x="58" y="32" font-family="Outfit, Arial, sans-serif" font-size="22" font-weight="800" fill="#ffffff">Top<tspan fill="#22c55e">HD</tspan>Movies</text>
+</svg>
