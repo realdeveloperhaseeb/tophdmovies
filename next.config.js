@@ -7,6 +7,13 @@ const nextConfig = {
       { protocol: 'https', hostname: '**' },
       { protocol: 'http', hostname: '**' },
     ],
+    // Serve images directly (no /_next/image optimizer). This lets our
+    // generated SVG posters work, and avoids the CPU/memory-heavy optimizer
+    // on shared Node hosting. SVGs are vector (tiny) so optimization is moot.
+    unoptimized: true,
+    dangerouslyAllowSVG: true,
+    contentDispositionType: 'inline',
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
 };
 
