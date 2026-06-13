@@ -45,8 +45,9 @@ export default async function HomePage() {
     const featuredId = await getSetting('featured_movie_id');
     if (featuredId) featuredOfWeek = await getMovieById(Number(featuredId));
     if (!featuredOfWeek) featuredOfWeek = featured[0] || latest[0] || null;
-  } catch {
+  } catch (err) {
     dbError = true;
+    console.error('[home] database error:', err);
   }
 
   if (dbError || (latest.length === 0 && featured.length === 0)) {
