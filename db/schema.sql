@@ -144,4 +144,14 @@ CREATE TABLE IF NOT EXISTS settings (
   PRIMARY KEY (`key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------- media (admin image uploads, served via /api/media/[id]) ----------
+CREATE TABLE IF NOT EXISTS media (
+  id         VARCHAR(40) NOT NULL,
+  mime       VARCHAR(100) NOT NULL,
+  data       MEDIUMBLOB NOT NULL,
+  size       INT UNSIGNED NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;

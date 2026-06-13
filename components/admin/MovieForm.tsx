@@ -5,6 +5,7 @@ import { useFormState, useFormStatus } from 'react-dom';
 import { saveMovie, type ActionState } from '@/lib/actions';
 import { slugify } from '@/lib/utils';
 import type { MovieWithRelations, Category, Genre } from '@/lib/types';
+import { ImageUpload } from './ImageUpload';
 
 const initial: ActionState = {};
 
@@ -97,12 +98,20 @@ export function MovieForm({
       {/* Media */}
       <Section title="Media">
         <Grid>
-          <Field label="Poster Image URL" full>
-            <input name="poster_url" className="input" defaultValue={movie?.poster_url ?? ''} placeholder="https://…" />
-          </Field>
-          <Field label="Backdrop Image URL" full>
-            <input name="backdrop_url" className="input" defaultValue={movie?.backdrop_url ?? ''} placeholder="https://…" />
-          </Field>
+          <ImageUpload
+            name="poster_url"
+            label="Poster Image"
+            defaultValue={movie?.poster_url}
+            aspect="poster"
+            hint="Portrait poster (shown on cards). JPG, PNG, WebP — up to 8 MB."
+          />
+          <ImageUpload
+            name="backdrop_url"
+            label="Backdrop Image"
+            defaultValue={movie?.backdrop_url}
+            aspect="video"
+            hint="Wide backdrop (shown on the hero & detail page). Up to 8 MB."
+          />
           <Field label="YouTube Trailer Video ID" full hint="Just the ID, e.g. dQw4w9WgXcQ">
             <input name="youtube_id" className="input" defaultValue={movie?.youtube_id ?? ''} placeholder="dQw4w9WgXcQ" />
           </Field>
