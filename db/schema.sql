@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS movies (
   title           VARCHAR(255) NOT NULL,
   slug            VARCHAR(280) NOT NULL,
   year            SMALLINT UNSIGNED DEFAULT NULL,
-  runtime         SMALLINT UNSIGNED DEFAULT NULL,        -- minutes
+  runtime         SMALLINT UNSIGNED DEFAULT NULL,        -- minutes (per episode for series)
+  episode_info    VARCHAR(120) DEFAULT NULL,             -- series, e.g. "5 Seasons · 62 Episodes"
   language        VARCHAR(120) DEFAULT NULL,
   country         VARCHAR(120) DEFAULT NULL,
   rating          DECIMAL(3,1) DEFAULT NULL,             -- out of 10

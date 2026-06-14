@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { transaction } from '@/lib/db';
+import { pool, transaction } from '@/lib/db';
 import { saveMedia } from '@/lib/media';
 import { slugify } from '@/lib/utils';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
@@ -15,6 +15,7 @@ interface MoviePayload {
   slug?: string;
   year?: number | null;
   runtime?: number | null;
+  episode_info?: string | null;
   language?: string | null;
   country?: string | null;
   rating?: number | null;
@@ -53,7 +54,7 @@ interface MoviePayload {
 }
 
 const COLS = [
-  'title','slug','year','runtime','language','country','rating','status',
+  'title','slug','year','runtime','episode_info','language','country','rating','status',
   'poster_url','backdrop_url','youtube_id','overview','short_description',
   'director','producer','writer','download_480','download_720','download_1080',
   'size_480','size_720','size_1080','embed_480','embed_720','embed_1080',
@@ -64,11 +65,34 @@ function requiredToken(): string {
   return process.env.IMPORT_TOKEN || process.env.ADMIN_SESSION_SECRET || '';
 }
 
+// Self-healing migration: add newer columns on older live DBs.
+let schemaEnsured = false;
+async function ensureSchema(): Promise<void> {
+  if (schemaEnsured) return;
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'movies' AND COLUMN_NAME = 'episode_info'`
+  );
+  if (rows.length === 0) {
+    await pool.query('ALTER TABLE movies ADD COLUMN episode_info VARCHAR(120) NULL AFTER runtime');
+  }
+  schemaEnsured = true;
+}
+
 export async function POST(req: Request) {
   const token = req.headers.get('x-import-token') || '';
   const expected = requiredToken();
   if (!expected || token !== expected) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+  }
+
+  try {
+    await ensureSchema();
+  } catch (err) {
+    return NextResponse.json(
+      { error: `Schema check failed: ${err instanceof Error ? err.message : 'unknown'}` },
+      { status: 500 }
+    );
   }
 
   let body: { movies?: MoviePayload[] };
@@ -147,6 +171,7 @@ async function upsertMovie(
     slug,
     year: m.year ?? null,
     runtime: m.runtime ?? null,
+    episode_info: m.episode_info ?? null,
     language: m.language ?? null,
     country: m.country ?? null,
     rating: m.rating ?? null,

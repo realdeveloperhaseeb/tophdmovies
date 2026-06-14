@@ -120,8 +120,8 @@ for (const m of movies) {
   }
 
   payload.push({
-    title: m.title, slug: m.slug, year: m.year, runtime: m.runtime, language: m.language,
-    country: m.country, rating: m.rating, status: m.status, youtube_id: m.youtube_id,
+    title: m.title, slug: m.slug, year: m.year, runtime: m.runtime, episode_info: m.episode_info,
+    language: m.language, country: m.country, rating: m.rating, status: m.status, youtube_id: m.youtube_id,
     overview: m.overview, short_description: m.short_description, director: m.director,
     producer: m.producer, writer: m.writer,
     download_480: m.download_480, download_720: m.download_720, download_1080: m.download_1080,

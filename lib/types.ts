@@ -6,6 +6,7 @@ export interface Movie {
   slug: string;
   year: number | null;
   runtime: number | null;
+  episode_info: string | null; // for series, e.g. "5 Seasons · 62 Episodes"
   language: string | null;
   country: string | null;
   rating: number | null;

@@ -91,7 +91,11 @@ export function MovieTabs({
               <tbody className="divide-y divide-border">
                 <DetailRow label="Title" value={movie.title} />
                 <DetailRow label="Release Year" value={movie.year ? String(movie.year) : '—'} />
-                <DetailRow label="Runtime" value={formatRuntime(movie.runtime)} />
+                {movie.episode_info ? (
+                  <DetailRow label="Seasons / Episodes" value={movie.episode_info} />
+                ) : (
+                  <DetailRow label="Runtime" value={formatRuntime(movie.runtime)} />
+                )}
                 <DetailRow label="Language" value={movie.language || '—'} />
                 <DetailRow label="Genres" value={movie.genres.map((g) => g.name).join(', ') || '—'} />
                 <DetailRow label="Country" value={movie.country || '—'} />

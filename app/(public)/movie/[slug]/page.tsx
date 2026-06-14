@@ -239,7 +239,11 @@ export default async function MoviePage({
                 <StarRating rating={movie.rating} />
               </div>
               <div className="mt-3 flex flex-wrap gap-2 text-sm text-white/70">
-                {movie.runtime ? <Meta>{formatRuntime(movie.runtime)}</Meta> : null}
+                {movie.episode_info ? (
+                  <Meta>{movie.episode_info}</Meta>
+                ) : movie.runtime ? (
+                  <Meta>{formatRuntime(movie.runtime)}</Meta>
+                ) : null}
                 {movie.language ? <Meta>{movie.language}</Meta> : null}
                 {movie.country ? <Meta>{movie.country}</Meta> : null}
               </div>
