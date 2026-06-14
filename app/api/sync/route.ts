@@ -95,14 +95,26 @@ export async function POST(req: Request) {
     );
   }
 
-  let body: { movies?: MoviePayload[] };
+  let body: { movies?: MoviePayload[]; delete?: string[] };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: 'Invalid JSON.' }, { status: 400 });
   }
+
+  // Optional: delete movies by slug (handy for removing mistakes).
+  let deleted = 0;
+  if (Array.isArray(body.delete) && body.delete.length) {
+    const res = await pool.query<ResultSetHeader>('DELETE FROM movies WHERE slug IN (?)', [
+      body.delete,
+    ]);
+    deleted = (res[0] as ResultSetHeader).affectedRows;
+  }
+
   const movies = body.movies;
   if (!Array.isArray(movies) || movies.length === 0) {
+    // A delete-only request is valid.
+    if (deleted > 0) return NextResponse.json({ ok: true, deleted });
     return NextResponse.json({ error: 'Provide a non-empty "movies" array.' }, { status: 400 });
   }
   if (movies.length > 200) {
@@ -130,6 +142,7 @@ export async function POST(req: Request) {
     ok: errors.length === 0,
     imported: results.length,
     failed: errors.length,
+    deleted,
     results,
     errors,
   });
