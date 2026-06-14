@@ -5,6 +5,7 @@
 //   TMDB_KEY=<v3 api key> SYNC_TOKEN=<ADMIN_SESSION_SECRET> \
 //     SITE_URL=https://tophdmovies.com node scripts/sync-tmdb.mjs [slug ...]
 import mysql from 'mysql2/promise';
+import { makePoster, makeBackdrop } from './poster-gen.mjs';
 
 const SITE_URL = (process.env.SITE_URL || 'http://localhost:3000').replace(/\/$/, '');
 const TOKEN = process.env.SYNC_TOKEN || '';
@@ -34,20 +35,30 @@ async function downloadImage(url) {
   }
 }
 
-async function tmdbFind(title, year) {
-  const clean = title.replace(/\*/g, '').trim();
+async function searchType(type, clean, year) {
+  const yp = type === 'tv' ? 'first_air_date_year' : 'year';
   const attempts = [
-    `query=${encodeURIComponent(clean)}&year=${year ?? ''}`,
+    `query=${encodeURIComponent(clean)}&${yp}=${year ?? ''}`,
     `query=${encodeURIComponent(clean)}`,
     `query=${encodeURIComponent(clean.split(':')[0])}`,
   ];
   for (const q of attempts) {
-    const url = `https://api.themoviedb.org/3/search/movie?api_key=${TMDB}&include_adult=false&${q}`;
+    const url = `https://api.themoviedb.org/3/search/${type}?api_key=${TMDB}&include_adult=false&${q}`;
     const res = await fetch(url);
     if (!res.ok) continue;
     const data = await res.json();
     const hit = (data.results || []).find((r) => r.poster_path) || data.results?.[0];
     if (hit) return hit;
+  }
+  return null;
+}
+
+// Search movies and TV. For series (web-series/tv-shows) try TV first.
+async function tmdbFind(title, year, isTv) {
+  const clean = title.replace(/\*/g, '').trim();
+  for (const t of isTv ? ['tv', 'movie'] : ['movie', 'tv']) {
+    const hit = await searchType(t, clean, year);
+    if (hit?.poster_path) return hit;
   }
   return null;
 }
@@ -70,32 +81,43 @@ sql += ' ORDER BY year, id';
 const [movies] = await conn.query(sql, params);
 
 const payload = [];
-const misses = [];
+let generated = 0;
 for (const m of movies) {
-  const hit = await tmdbFind(m.title, m.year);
-  const posterUrl = hit?.poster_path ? `${IMG}/${POSTER_SIZE}${hit.poster_path}` : null;
-  const backdropUrl = hit?.backdrop_path ? `${IMG}/${BACKDROP_SIZE}${hit.backdrop_path}` : null;
-  if (!posterUrl) {
-    misses.push(m.title);
-    continue; // leave existing artwork untouched
-  }
-
-  // Mirror the bytes into our own DB so we never depend on TMDB at runtime.
-  const posterImg = await downloadImage(posterUrl);
-  const backdropImg = backdropUrl ? await downloadImage(backdropUrl) : null;
-
   const [cats] = await conn.query(
     'SELECT c.slug FROM categories c JOIN movie_categories mc ON mc.category_id=c.id WHERE mc.movie_id=?',
     [m.id]
   );
   const [gens] = await conn.query(
-    'SELECT g.slug FROM genres g JOIN movie_genres mg ON mg.genre_id=g.id WHERE mg.movie_id=?',
+    'SELECT g.name, g.slug FROM genres g JOIN movie_genres mg ON mg.genre_id=g.id WHERE mg.movie_id=?',
     [m.id]
   );
   const [cast] = await conn.query(
     'SELECT actor_name, character_name FROM movie_cast WHERE movie_id=? ORDER BY sort_order',
     [m.id]
   );
+
+  const catSlugs = cats.map((x) => x.slug);
+  const isTv = catSlugs.includes('web-series') || catSlugs.includes('tv-shows');
+  const hit = await tmdbFind(m.title, m.year, isTv);
+
+  const art = {};
+  if (hit?.poster_path) {
+    const posterImg = await downloadImage(`${IMG}/${POSTER_SIZE}${hit.poster_path}`);
+    const backdropImg = hit.backdrop_path
+      ? await downloadImage(`${IMG}/${BACKDROP_SIZE}${hit.backdrop_path}`)
+      : null;
+    if (posterImg) art.poster_image = posterImg;
+    if (backdropImg) art.backdrop_image = backdropImg;
+    console.log(`  ✓ ${m.title} -> ${hit.title || hit.name} [${isTv ? 'tv' : 'movie'}]`);
+  }
+  // Fallback: generate a poster so every title has artwork.
+  if (!art.poster_image) {
+    const meta = { title: m.title, year: m.year, runtime: m.runtime, rating: m.rating, tags: gens.map((g) => g.name) };
+    art.poster_svg = makePoster(meta);
+    art.backdrop_svg = makeBackdrop(meta);
+    generated++;
+    console.log(`  ◆ ${m.title} -> generated poster (no TMDB match)`);
+  }
 
   payload.push({
     title: m.title, slug: m.slug, year: m.year, runtime: m.runtime, language: m.language,
@@ -106,20 +128,14 @@ for (const m of movies) {
     size_480: m.size_480, size_720: m.size_720, size_1080: m.size_1080,
     embed_480: m.embed_480, embed_720: m.embed_720, embed_1080: m.embed_1080,
     is_featured: m.is_featured, is_trending: m.is_trending, is_top_rated: m.is_top_rated,
-    categories: cats.map((x) => x.slug), genres: gens.map((x) => x.slug),
+    categories: catSlugs, genres: gens.map((x) => x.slug),
     cast: cast.map((x) => ({ actor_name: x.actor_name, character_name: x.character_name })),
-    // Prefer mirrored bytes; fall back to the TMDB URL if a download failed.
-    poster_image: posterImg || undefined,
-    backdrop_image: backdropImg || undefined,
-    poster_url: posterImg ? undefined : posterUrl,
-    backdrop_url: backdropImg ? undefined : backdropUrl,
+    ...art,
   });
-  console.log(`  ✓ ${m.title} -> ${hit.title}${hit.release_date ? ' (' + hit.release_date.slice(0, 4) + ')' : ''}`);
 }
 await conn.end();
 
-console.log(`\nFound posters for ${payload.length}/${movies.length}. Pushing to ${SITE_URL}...`);
-if (misses.length) console.log('No TMDB match (kept existing):', misses.join(', '));
+console.log(`\n${payload.length} movies (${generated} generated posters). Pushing to ${SITE_URL}...`);
 
 const BATCH = 4; // image bytes make payloads large — keep batches small
 let imported = 0, failed = 0;
