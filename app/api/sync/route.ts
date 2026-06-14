@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { transaction } from '@/lib/db';
+import { pool, transaction } from '@/lib/db';
 import { saveMedia } from '@/lib/media';
 import { slugify } from '@/lib/utils';
 import type { ResultSetHeader, RowDataPacket } from 'mysql2';
@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 interface MoviePayload {
   title: string;
+  title_hi?: string | null;
   slug?: string;
   year?: number | null;
   runtime?: number | null;
@@ -53,7 +54,7 @@ interface MoviePayload {
 }
 
 const COLS = [
-  'title','slug','year','runtime','language','country','rating','status',
+  'title','title_hi','slug','year','runtime','language','country','rating','status',
   'poster_url','backdrop_url','youtube_id','overview','short_description',
   'director','producer','writer','download_480','download_720','download_1080',
   'size_480','size_720','size_1080','embed_480','embed_720','embed_1080',
@@ -64,11 +65,34 @@ function requiredToken(): string {
   return process.env.IMPORT_TOKEN || process.env.ADMIN_SESSION_SECRET || '';
 }
 
+// Self-healing migration: add the title_hi column on older live DBs.
+let schemaEnsured = false;
+async function ensureSchema(): Promise<void> {
+  if (schemaEnsured) return;
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'movies' AND COLUMN_NAME = 'title_hi'`
+  );
+  if (rows.length === 0) {
+    await pool.query('ALTER TABLE movies ADD COLUMN title_hi VARCHAR(255) NULL AFTER title');
+  }
+  schemaEnsured = true;
+}
+
 export async function POST(req: Request) {
   const token = req.headers.get('x-import-token') || '';
   const expected = requiredToken();
   if (!expected || token !== expected) {
     return NextResponse.json({ error: 'Unauthorized.' }, { status: 401 });
+  }
+
+  try {
+    await ensureSchema();
+  } catch (err) {
+    return NextResponse.json(
+      { error: `Schema check failed: ${err instanceof Error ? err.message : 'unknown'}` },
+      { status: 500 }
+    );
   }
 
   let body: { movies?: MoviePayload[] };
@@ -144,6 +168,7 @@ async function upsertMovie(
 
   const values: Record<string, unknown> = {
     title: m.title.trim(),
+    title_hi: m.title_hi ?? null,
     slug,
     year: m.year ?? null,
     runtime: m.runtime ?? null,
@@ -185,9 +210,18 @@ async function upsertMovie(
     if (existing.length) {
       movieId = existing[0].id;
       action = 'updated';
-      const setSql = COLS.map((c) => `\`${c}\` = ?`).join(', ');
+      // On update, don't overwrite existing artwork unless new art was supplied
+      // (lets us push text-only edits without re-uploading images).
+      const posterProvided = !!(m.poster_image?.data || m.poster_svg || m.poster_url);
+      const backdropProvided = !!(m.backdrop_image?.data || m.backdrop_svg || m.backdrop_url);
+      const updateCols = COLS.filter(
+        (c) =>
+          !(c === 'poster_url' && !posterProvided) &&
+          !(c === 'backdrop_url' && !backdropProvided)
+      );
+      const setSql = updateCols.map((c) => `\`${c}\` = ?`).join(', ');
       await conn.query(`UPDATE movies SET ${setSql} WHERE id = ?`, [
-        ...COLS.map((c) => values[c]),
+        ...updateCols.map((c) => values[c]),
         movieId,
       ]);
     } else {

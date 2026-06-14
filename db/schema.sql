@@ -11,6 +11,7 @@ SET FOREIGN_KEY_CHECKS = 0;
 CREATE TABLE IF NOT EXISTS movies (
   id              INT UNSIGNED NOT NULL AUTO_INCREMENT,
   title           VARCHAR(255) NOT NULL,
+  title_hi        VARCHAR(255) DEFAULT NULL,            -- Hindi title (shown alongside English)
   slug            VARCHAR(280) NOT NULL,
   year            SMALLINT UNSIGNED DEFAULT NULL,
   runtime         SMALLINT UNSIGNED DEFAULT NULL,        -- minutes

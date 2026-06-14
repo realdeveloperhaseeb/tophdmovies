@@ -38,6 +38,9 @@ export function MovieCard({ movie, className = '' }: { movie: Movie; className?:
         <h3 className="clamp-2 text-[15px] font-semibold leading-snug group-hover:text-accent">
           {movie.title}
         </h3>
+        {movie.title_hi && (
+          <p className="clamp-1 mt-0.5 text-[13px] font-medium text-white/55">{movie.title_hi}</p>
+        )}
         <div className="mt-1.5 flex items-center gap-2 text-[13px] text-white/50">
           <span>{movie.year || '—'}</span>
           {movie.language && (
