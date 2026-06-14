@@ -232,17 +232,9 @@ export default async function MoviePage({
                 {movie.title}{' '}
                 {movie.year && <span className="font-bold text-white/50">({movie.year})</span>}
               </h1>
-              {movie.title_hi && (
-                <p className="mt-1 text-xl font-semibold text-white/75">{movie.title_hi}</p>
-              )}
               <p className="mt-2 text-sm font-medium text-accent">
                 Download in HD 480p • 720p • 1080p
               </p>
-              {movie.short_description && (
-                <p className="mt-3 text-[15px] leading-relaxed text-white/70">
-                  {movie.short_description}
-                </p>
-              )}
               <div className="mt-3">
                 <StarRating rating={movie.rating} />
               </div>

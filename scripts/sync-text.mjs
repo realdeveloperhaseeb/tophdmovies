@@ -48,7 +48,7 @@ for (const m of movies) {
   );
   // NOTE: intentionally NO poster_url / backdrop_url / images here.
   payload.push({
-    title: m.title, title_hi: m.title_hi, slug: m.slug, year: m.year, runtime: m.runtime,
+    title: m.title, slug: m.slug, year: m.year, runtime: m.runtime,
     language: m.language, country: m.country, rating: m.rating, status: m.status,
     youtube_id: m.youtube_id, overview: m.overview, short_description: m.short_description,
     director: m.director, producer: m.producer, writer: m.writer,

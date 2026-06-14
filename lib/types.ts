@@ -3,7 +3,6 @@ export type MovieStatus = 'published' | 'draft';
 export interface Movie {
   id: number;
   title: string;
-  title_hi: string | null;
   slug: string;
   year: number | null;
   runtime: number | null;
