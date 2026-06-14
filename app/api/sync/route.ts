@@ -46,6 +46,10 @@ interface MoviePayload {
   // the media table and overrides poster_url / backdrop_url with /api/media/*.
   poster_svg?: string;
   backdrop_svg?: string;
+  // Optional raw image bytes (base64) — used to mirror external images (e.g.
+  // TMDB) into our own DB so the site never depends on a third-party CDN.
+  poster_image?: { data: string; mime?: string };
+  backdrop_image?: { data: string; mime?: string };
 }
 
 const COLS = [
@@ -113,14 +117,27 @@ async function upsertMovie(
 ): Promise<{ id: number; action: 'inserted' | 'updated' }> {
   const b = (v: unknown) => (v === true || v === 1 || v === '1' ? 1 : 0);
 
-  // Store any generated artwork first, then point the URL fields at it.
+  // Store any supplied artwork in the media table, then point the URL fields
+  // at our own copy. Precedence: raw image bytes > generated SVG > plain URL.
   let posterUrl = m.poster_url ?? null;
   let backdropUrl = m.backdrop_url ?? null;
-  if (m.poster_svg) {
+  if (m.poster_image?.data) {
+    const id = await saveMedia(
+      Buffer.from(m.poster_image.data, 'base64'),
+      m.poster_image.mime || 'image/jpeg'
+    );
+    posterUrl = `/api/media/${id}`;
+  } else if (m.poster_svg) {
     const id = await saveMedia(Buffer.from(m.poster_svg, 'utf8'), 'image/svg+xml');
     posterUrl = `/api/media/${id}`;
   }
-  if (m.backdrop_svg) {
+  if (m.backdrop_image?.data) {
+    const id = await saveMedia(
+      Buffer.from(m.backdrop_image.data, 'base64'),
+      m.backdrop_image.mime || 'image/jpeg'
+    );
+    backdropUrl = `/api/media/${id}`;
+  } else if (m.backdrop_svg) {
     const id = await saveMedia(Buffer.from(m.backdrop_svg, 'utf8'), 'image/svg+xml');
     backdropUrl = `/api/media/${id}`;
   }

@@ -20,6 +20,20 @@ const IMG = 'https://image.tmdb.org/t/p';
 const POSTER_SIZE = 'w500';
 const BACKDROP_SIZE = 'w1280';
 
+// Download an image and return it as base64 + mime, so it can be stored in our
+// own DB (mirrored). Returns null on failure (we then fall back to the URL).
+async function downloadImage(url) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const buf = Buffer.from(await res.arrayBuffer());
+    const mime = res.headers.get('content-type') || 'image/jpeg';
+    return { data: buf.toString('base64'), mime };
+  } catch {
+    return null;
+  }
+}
+
 async function tmdbFind(title, year) {
   const clean = title.replace(/\*/g, '').trim();
   const attempts = [
@@ -59,12 +73,16 @@ const payload = [];
 const misses = [];
 for (const m of movies) {
   const hit = await tmdbFind(m.title, m.year);
-  const poster = hit?.poster_path ? `${IMG}/${POSTER_SIZE}${hit.poster_path}` : null;
-  const backdrop = hit?.backdrop_path ? `${IMG}/${BACKDROP_SIZE}${hit.backdrop_path}` : null;
-  if (!poster) {
+  const posterUrl = hit?.poster_path ? `${IMG}/${POSTER_SIZE}${hit.poster_path}` : null;
+  const backdropUrl = hit?.backdrop_path ? `${IMG}/${BACKDROP_SIZE}${hit.backdrop_path}` : null;
+  if (!posterUrl) {
     misses.push(m.title);
     continue; // leave existing artwork untouched
   }
+
+  // Mirror the bytes into our own DB so we never depend on TMDB at runtime.
+  const posterImg = await downloadImage(posterUrl);
+  const backdropImg = backdropUrl ? await downloadImage(backdropUrl) : null;
 
   const [cats] = await conn.query(
     'SELECT c.slug FROM categories c JOIN movie_categories mc ON mc.category_id=c.id WHERE mc.movie_id=?',
@@ -90,7 +108,11 @@ for (const m of movies) {
     is_featured: m.is_featured, is_trending: m.is_trending, is_top_rated: m.is_top_rated,
     categories: cats.map((x) => x.slug), genres: gens.map((x) => x.slug),
     cast: cast.map((x) => ({ actor_name: x.actor_name, character_name: x.character_name })),
-    poster_url: poster, backdrop_url: backdrop,
+    // Prefer mirrored bytes; fall back to the TMDB URL if a download failed.
+    poster_image: posterImg || undefined,
+    backdrop_image: backdropImg || undefined,
+    poster_url: posterImg ? undefined : posterUrl,
+    backdrop_url: backdropImg ? undefined : backdropUrl,
   });
   console.log(`  ✓ ${m.title} -> ${hit.title}${hit.release_date ? ' (' + hit.release_date.slice(0, 4) + ')' : ''}`);
 }
@@ -99,7 +121,7 @@ await conn.end();
 console.log(`\nFound posters for ${payload.length}/${movies.length}. Pushing to ${SITE_URL}...`);
 if (misses.length) console.log('No TMDB match (kept existing):', misses.join(', '));
 
-const BATCH = 10;
+const BATCH = 4; // image bytes make payloads large — keep batches small
 let imported = 0, failed = 0;
 for (let i = 0; i < payload.length; i += BATCH) {
   const res = await fetch(`${SITE_URL}/api/sync`, {
